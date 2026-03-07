@@ -404,8 +404,18 @@
 
         // --- BACK BUTTON LOGIC ---
         btnBack.addEventListener('click', () => {
-            // Kembali ke view utama (Library/History)
-            switchTab(currentView === 'reader' ? 'library' : currentView);
+            if (reader.style.display === 'flex') {
+                // Jika sedang di Reader, kembali ke Detail Buku
+                const book = libraryData.find(b => b.path === currentBookPath) || riwayatBacaan.find(b => b.path === currentBookPath);
+                if (book) {
+                    showBookDetail(book);
+                } else {
+                    switchTab(currentView);
+                }
+            } else {
+                // Jika sedang di Detail, kembali ke Tab Utama (Library/History/etc)
+                switchTab(currentView);
+            }
         });
 
         // --- REFRESH / SCAN LOGIC ---
@@ -449,7 +459,8 @@
         }
 
         function showBookDetail(book) {
-            document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+            // Sembunyikan semua view termasuk reader
+            document.querySelectorAll('.view-section, .reader-container').forEach(el => el.style.display = 'none');
             const detailView = document.getElementById('view-detail');
             detailView.style.display = 'block';
             pageTitle.innerText = "Informasi Buku";
@@ -457,6 +468,7 @@
             // UI Adjustments for Detail View
             btnBack.style.display = 'block';
             searchInput.style.display = 'none';
+            readerSettingsContainer.style.display = 'none';
 
             // Handle Cover Detail
             const coverStyle = book.cover 
