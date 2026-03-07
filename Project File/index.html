@@ -106,6 +106,11 @@
         .filter-tag { padding: 6px 12px; background: white; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 0.85rem; color: #64748b; cursor: pointer; transition: 0.2s; }
         .filter-tag:hover, .filter-tag.active { background: var(--accent); color: white; border-color: var(--accent); }
     </style>
+    <!-- Integrasi PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </head>
 <body>
 
@@ -198,6 +203,7 @@
     <script>
         const { ipcRenderer } = require('electron');
         const path = require('path');
+        const fs = require('fs');
 
         const btnPilihFile = document.getElementById('btn-pilih-file');
         const btnBack = document.getElementById('btn-back');
@@ -205,6 +211,8 @@
         const searchInput = document.getElementById('search-input');
         const pageTitle = document.getElementById('page-title');
         const reader = document.getElementById('reader');
+        let currentBookPath = null;
+        let saveTimeout;
         
         // --- DATA MANAGEMENT ---
         // Load data dari localStorage atau gunakan default
@@ -446,7 +454,7 @@
             }
         }
 
-        function bacaFile(filePath, title) {
+        async function bacaFile(filePath, title) {
             const fileName = title || path.basename(filePath);
             const ext = path.extname(filePath).toLowerCase();
             
@@ -461,18 +469,78 @@
             // currentView = 'reader'; // Optional: track reader state
 
             // Tambahkan ke riwayat
-            const existingBook = libraryData.find(b => b.path === filePath) || { title: fileName, path: filePath };
-            // Hapus jika sudah ada (supaya naik ke paling atas)
-            riwayatBacaan = riwayatBacaan.filter(r => r.path !== filePath);
-            riwayatBacaan.unshift(existingBook);
+            currentBookPath = filePath;
+            let historyItem = riwayatBacaan.find(r => r.path === filePath);
+
+            if (historyItem) {
+                riwayatBacaan = riwayatBacaan.filter(r => r.path !== filePath);
+            } else {
+                const libBook = libraryData.find(b => b.path === filePath);
+                historyItem = libBook ? { ...libBook } : { title: fileName, path: filePath };
+                historyItem.lastPage = 1;
+            }
+            
+            riwayatBacaan.unshift(historyItem);
             saveData(); // Simpan history
 
             // Bersihkan reader
             reader.innerHTML = '';
 
-            // TODO: Integrasi pustaka (pdf.js / epub.js / jszip) dilakukan di sini.
-            // Sebagai simulasi gaya Webtoon, kita buat beberapa kotak panjang ke bawah.
-            renderSimulasiWebtoon(ext);
+            if (ext === '.pdf') {
+                await renderPDF(filePath);
+            } else {
+                renderSimulasiWebtoon(ext);
+            }
+
+            // Restore Last Read Position
+            if (historyItem.lastPage && historyItem.lastPage > 1) {
+                setTimeout(() => {
+                    const pageElement = document.querySelector(`.page-placeholder[data-page="${historyItem.lastPage}"]`);
+                    if (pageElement) pageElement.scrollIntoView();
+                }, 100);
+            }
+        }
+
+        async function renderPDF(filePath) {
+            try {
+                // Baca file lokal menggunakan fs agar tidak kena blokir browser security
+                const data = new Uint8Array(fs.readFileSync(filePath));
+                const loadingTask = pdfjsLib.getDocument(data);
+                const pdf = await loadingTask.promise;
+                
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const scale = 1.5; // Zoom level (bisa diubah nanti)
+                    const viewport = page.getViewport({ scale });
+
+                    const div = document.createElement('div');
+                    div.className = 'page-placeholder';
+                    div.setAttribute('data-page', pageNum);
+                    // Override style default agar tinggi menyesuaikan konten
+                    div.style.height = 'auto';
+                    div.style.background = 'transparent';
+                    div.style.boxShadow = 'none';
+                    div.innerText = '';
+
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    canvas.style.maxWidth = '100%';
+                    canvas.style.height = 'auto';
+                    canvas.style.marginBottom = '10px';
+                    
+                    div.appendChild(canvas);
+                    reader.appendChild(div);
+
+                    // Render page ke canvas
+                    const renderContext = { canvasContext: context, viewport: viewport };
+                    page.render(renderContext);
+                }
+            } catch (error) {
+                reader.innerHTML = `<div style="padding:20px; color:red;">Gagal memuat PDF: ${error.message}</div>`;
+                console.error(error);
+            }
         }
 
         function renderSimulasiWebtoon(ext) {
@@ -484,6 +552,27 @@
                 reader.appendChild(page);
             }
         }
+
+        // --- SCROLL LISTENER (Last Read) ---
+        reader.addEventListener('scroll', () => {
+            if (!currentBookPath) return;
+
+            const pages = document.querySelectorAll('.page-placeholder');
+            for (let page of pages) {
+                const rect = page.getBoundingClientRect();
+                // Cek jika halaman terlihat di viewport (offset sedikit agar akurat)
+                if (rect.top < window.innerHeight / 2 && rect.bottom > 0) {
+                    const pageNum = parseInt(page.getAttribute('data-page'));
+                    const historyItem = riwayatBacaan.find(r => r.path === currentBookPath);
+                    if (historyItem && historyItem.lastPage !== pageNum) {
+                        historyItem.lastPage = pageNum;
+                        clearTimeout(saveTimeout);
+                        saveTimeout = setTimeout(saveData, 1000); // Simpan setiap 1 detik setelah berhenti scroll
+                    }
+                    break; 
+                }
+            }
+        });
 
         // --- EXPLORE FUNCTIONS ---
         function renderExplore() {
