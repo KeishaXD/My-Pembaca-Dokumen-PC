@@ -189,6 +189,11 @@
             height: 16px;
         }
 
+        /* Context Menu */
+        .context-menu { display: none; position: absolute; background: white; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 8px; z-index: 2000; min-width: 160px; overflow: hidden; }
+        .context-item { padding: 12px 16px; cursor: pointer; font-size: 0.9rem; color: #ef4444; transition: background 0.2s; display: flex; align-items: center; gap: 8px; }
+        .context-item:hover { background-color: #fef2f2; }
+
         /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
         .modal.show { display: flex; }
@@ -319,6 +324,11 @@
         </button>
     </div>
 
+    <!-- Context Menu -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-item" id="ctx-delete">🗑 Hapus Buku</div>
+    </div>
+
     <!-- Add Book Modal -->
     <div id="add-book-modal" class="modal">
         <div class="modal-content">
@@ -390,6 +400,11 @@
         const btnCancelAdd = document.getElementById('btn-cancel-add');
         const btnSaveAdd = document.getElementById('btn-save-add');
         
+        // Context Menu Elements
+        const contextMenu = document.getElementById('context-menu');
+        const ctxDelete = document.getElementById('ctx-delete');
+        let contextMenuBookId = null;
+
         let currentBookPath = null;
         let saveTimeout;
         
@@ -526,6 +541,10 @@
                 </div>
             `;
             div.addEventListener('click', () => showBookDetail(book));
+            div.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showContextMenu(e.pageX, e.pageY, book.id);
+            });
             return div;
         }
 
@@ -583,6 +602,7 @@
                         <div class="action-buttons">
                             <button class="btn-primary" onclick="alert('Pilih chapter di bawah')">▶ LIHAT CHAPTER</button>
                             <button class="btn-secondary" onclick="toggleFavorite(${book.id})">${favBtnText}</button>
+                            <button class="btn-secondary" style="color: #ef4444; border-color: #ef4444;" onclick="deleteBook(${book.id})">🗑 Hapus</button>
                         </div>
                         <p class="detail-desc">${book.synopsis || 'Tidak ada sinopsis tersedia.'}</p>
                     </div>
@@ -603,6 +623,35 @@
                 showBookDetail(book); // Refresh tampilan detail untuk update tombol
             }
         };
+
+        // Fungsi Hapus Buku
+        window.deleteBook = function(bookId) {
+            if (confirm('Apakah Anda yakin ingin menghapus buku ini dari pustaka?')) {
+                const book = libraryData.find(b => b.id === bookId);
+                if (book) {
+                    // Hapus dari Library
+                    libraryData = libraryData.filter(b => b.id !== bookId);
+                    // Hapus dari Riwayat (berdasarkan path agar konsisten)
+                    riwayatBacaan = riwayatBacaan.filter(r => r.path !== book.path);
+                    saveData();
+                    switchTab('library');
+                }
+            }
+        };
+
+        // --- CONTEXT MENU LOGIC ---
+        function showContextMenu(x, y, bookId) {
+            contextMenuBookId = bookId;
+            contextMenu.style.left = `${x}px`;
+            contextMenu.style.top = `${y}px`;
+            contextMenu.style.display = 'block';
+        }
+
+        document.addEventListener('click', () => {
+            contextMenu.style.display = 'none';
+        });
+
+        ctxDelete.addEventListener('click', () => deleteBook(contextMenuBookId));
 
         // --- MODAL LOGIC ---
         let pendingBookPath = null;
