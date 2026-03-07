@@ -332,3 +332,8 @@ ipcMain.handle('updater:check', async () => {
         return { error: error.message };
     }
 });
+
+// --- FITUR BARU: KELUAR APLIKASI ---
+ipcMain.on('app:quit', () => {
+    app.quit();
+});

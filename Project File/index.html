@@ -823,6 +823,7 @@
                 btn_delete: "Hapus",
                 msg_saved: "Pengaturan berhasil disimpan!",
                 msg_delete_confirm: "Apakah Anda yakin ingin menghapus buku ini dari pustaka?",
+                msg_exit_confirm: "Apakah Anda yakin ingin keluar dari aplikasi?",
                 msg_update_check: "Sedang memeriksa pembaruan...\n\nAnda menggunakan versi terbaru (v1.0.0).",
                 // --- NEW TRANSLATIONS ---
                 modal_add_title: "Tambah Buku Baru",
@@ -918,6 +919,7 @@
                 btn_delete: "Delete",
                 msg_saved: "Settings saved successfully!",
                 msg_delete_confirm: "Are you sure you want to delete this book from the library?",
+                msg_exit_confirm: "Are you sure you want to exit the application?",
                 msg_update_check: "Checking for updates...\n\nYou are using the latest version (v1.0.0).",
                 // --- NEW TRANSLATIONS ---
                 modal_add_title: "Add New Book",
@@ -2156,18 +2158,24 @@
                 // Cek tombol back (jika terlihat, klik)
                 if (btnBack.style.display !== 'none') {
                     btnBack.click();
+                    return; // Penting: Stop di sini agar tidak lanjut ke konfirmasi keluar
+                }
+
+                // Jika di halaman utama (tidak ada modal/popup/tombol back), konfirmasi keluar
+                if (confirm(t('msg_exit_confirm'))) {
+                    ipcRenderer.send('app:quit');
                 }
             }
 
-            // Navigasi Reader dengan Panah Kanan/Kiri
+            // Navigasi Scroll & Reader
             if (reader.style.display === 'flex') {
                 const scrollAmount = 400; // Jarak scroll diperbesar agar lebih cepat
 
                 if (e.key === 'ArrowDown') {
-                    // Scroll Bawah
+                    // Scroll Bawah Reader
                     reader.scrollBy({ top: scrollAmount, behavior: 'smooth' });
                 } else if (e.key === 'ArrowUp') {
-                    // Scroll Atas
+                    // Scroll Atas Reader
                     reader.scrollBy({ top: -scrollAmount, behavior: 'smooth' });
                 } else if (e.key === 'ArrowRight') {
                     // Ganti Halaman (Next Page)
@@ -2175,6 +2183,17 @@
                 } else if (e.key === 'ArrowLeft') {
                     // Ganti Halaman (Prev Page)
                     goToPrevPage();
+                }
+            } else {
+                // Scroll untuk View Lain (Library, Detail, Settings, dll)
+                const activeView = Array.from(document.querySelectorAll('.view-section')).find(el => el.style.display === 'block');
+                if (activeView) {
+                    const menuScrollAmount = 200; // Scroll lebih santai untuk menu
+                    if (e.key === 'ArrowDown') {
+                        activeView.scrollBy({ top: menuScrollAmount, behavior: 'smooth' });
+                    } else if (e.key === 'ArrowUp') {
+                        activeView.scrollBy({ top: -menuScrollAmount, behavior: 'smooth' });
+                    }
                 }
             }
         });
