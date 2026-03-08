@@ -1339,10 +1339,14 @@
 
                         const isRead = riwayatBacaan.some(r => r.path === chap.path);
                         const readClass = isRead ? 'chapter-read' : '';
+                        const checkColor = isRead ? '#3b82f6' : '#94a3b8';
                         chapterListHtml += `
                         <div class="chapter-row ${readClass}" onclick="bacaFile('${safePath}', '${safeTitle}')" style="cursor: pointer;">
                             <div style="flex-grow: 1;"><span class="chapter-name">${chap.name}</span></div>
-                            <div style="display: flex; align-items: center; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div title="${isRead ? 'Sudah Dibaca' : 'Belum Dibaca'}" style="color: ${checkColor}; display: flex; cursor: pointer;" onclick="event.stopPropagation(); toggleReadStatus(${book.id}, ${index})">
+                                    <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg>
+                                </div>
                                 <button class="btn-icon" onclick="event.stopPropagation(); toggleChapterFavorite(${book.id}, ${index})" title="${isChapFav ? t('msg_unmark_fav') : t('msg_mark_fav')}">
                                     <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:${starColor};fill:${starFill};stroke-width:2"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                                 </button>
@@ -1648,6 +1652,32 @@
                 saveData();
                 showBookDetail(book);
             }
+        };
+
+        // Fungsi Toggle Status Baca (Read/Unread)
+        window.toggleReadStatus = function(bookId, chapterIndex) {
+            const book = libraryData.find(b => b.id == bookId);
+            if (!book || !book.chapters || !book.chapters[chapterIndex]) return;
+
+            const chapter = book.chapters[chapterIndex];
+            const isRead = riwayatBacaan.some(r => r.path === chapter.path);
+
+            if (isRead) {
+                // Hapus dari riwayat (Tandai belum dibaca)
+                riwayatBacaan = riwayatBacaan.filter(r => r.path !== chapter.path);
+            } else {
+                // Tambah ke riwayat (Tandai sudah dibaca)
+                const historyItem = {
+                    title: `${book.title} - ${chapter.name}`,
+                    path: chapter.path,
+                    cover: book.cover,
+                    lastPage: 1
+                };
+                riwayatBacaan.unshift(historyItem);
+            }
+            
+            saveData();
+            showBookDetail(book); // Refresh UI
         };
 
         // Fungsi Hapus Buku
